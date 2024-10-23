@@ -53,7 +53,7 @@ def main():
     parser.add_argument('--check', '-c', action='store_true', help='Check if the patches can be applied cleanly.')
     parser.add_argument('--log', '-l', action='store_true', help='Display Git logs after applying the patches.')
     parser.add_argument('--oneline', '-o', action='store_true', help='Show Git logs in one-line format (requires --log).')
-    parser.add_argument('--reset', action='store_true', help='Reset the repository to the state before applying patches.')
+    # parser.add_argument('--reset', action='store_true', help='Reset the repository to the state before applying patches.')
     args = parser.parse_args()
 
     if args.oneline and not args.log:
@@ -78,8 +78,8 @@ def main():
         try:
             os.chdir(target_full_path)
 
-            if args.reset:
-                subprocess.run(['git', 'reset', '--hard', f'HEAD~{str(len(patch_file_list))}'], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            # if args.reset:
+            #    subprocess.run(['git', 'reset', '--hard', f'HEAD~{str(len(patch_file_list))}'], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
             if args.check or args.apply:
                 for patch_path in patch_file_list:
