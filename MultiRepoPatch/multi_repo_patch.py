@@ -8,25 +8,12 @@ CWD = os.path.dirname(os.path.abspath(__file__))
 HOME = os.path.expanduser('~')
 
 
+TITLE_TARGET = "TARGET: "
+TITLE_PATCH = ""
+
+
 def separator(ch: str = '='):
     print(ch * 128)
-
-
-def apply_patch(patch_path, args):
-    try:
-        # First, check if the patch can be applied
-        if args.check:
-            subprocess.run(['git', 'apply', patch_path, '--check'], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-
-        # Apply the patch if requested
-        if args.apply:
-            subprocess.run(['git', 'am', patch_path], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-
-        print(f'Success')
-    except subprocess.CalledProcessError as e:
-        print(f"Error: {e.stderr.decode()}")
-    except Exception as e:
-        print(f"Error: {e}")
 
 
 def load_repositories_from_json(json_file_path):
@@ -35,13 +22,84 @@ def load_repositories_from_json(json_file_path):
             return json.load(json_file)
     except FileNotFoundError:
         print(f"JSON file {json_file_path} not found.")
-        return {}
     except json.JSONDecodeError:
         print(f"Error decoding JSON file {json_file_path}.")
-        return {}
     except Exception as e:
         print(f"Unexpected error while loading JSON: {e}")
-        return {}
+    return {}
+
+
+def run_git_command(command, error_message):
+    try:
+        result = subprocess.run(command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        return result.stdout.decode()
+    except subprocess.CalledProcessError as e:
+        print(f"{error_message}: {e.stderr.decode() if e.stderr else 'No error message available'}")
+        return None
+
+
+def run_git_command_nopipe(command, error_message):
+    try:
+        subprocess.run(command, check=True, stderr=subprocess.PIPE)
+    except subprocess.CalledProcessError as e:
+        print(f"{error_message}: {e.stderr.decode() if e.stderr else 'No error message available'}")
+
+
+def check_patch(patch_path):
+    return run_git_command(['git', 'apply', patch_path, '--check'], "Failed to check patch applicability") is not None
+
+
+def apply_patch(patch_path):
+    return run_git_command(['git', 'am', patch_path], "Failed to apply patch") is not None
+
+
+def show_patch(index):
+    return run_git_command_nopipe(['git', 'show', f'HEAD~{index}'], "Failed to display patch") is not None
+
+
+def display_git_logs(num_patches, oneline=False):
+    log_command = ['git', 'log', '-n', str(num_patches)]
+    if oneline:
+        log_command.append('--oneline')
+    return run_git_command_nopipe(log_command, "Failed to display git logs") is not None
+
+
+def reset_patch(len_patches):
+    return run_git_command(['git', 'reset', '--hard', f'HEAD~{str(len_patches)}'], "Failed to display git logs") is not None
+
+
+def apply_patch_list(target_path, patch_file_list, target_root, patch_root, args):
+    separator("=")
+    target_full_path = os.path.join(target_root, target_path)
+    print(f'{TITLE_TARGET}{target_full_path}')
+
+    original_dir = os.getcwd()
+    try:
+        os.chdir(target_full_path)
+
+        if args.reset:
+            reset_patch(len(patch_file_list))
+
+        for i, patch_path in enumerate(patch_file_list):
+            patch_full_path = os.path.join(patch_root, patch_path)
+            if args.check or args.apply or args.show:
+                separator("-")
+                print(f'{TITLE_PATCH}{patch_full_path}')
+            if args.check:
+                if not check_patch(patch_full_path):
+                    break
+            if args.apply:
+                if not apply_patch(patch_full_path):
+                    break
+            if args.show:
+                if not show_patch(i):
+                    break
+
+        if args.log:
+            separator("-")
+            display_git_logs(len(patch_file_list) + 1, args.oneline)
+    finally:
+        os.chdir(original_dir)
 
 
 def main():
@@ -54,7 +112,7 @@ def main():
     parser.add_argument('--show', '-s', action='store_true', help='Show the list of patches without applying them.')
     parser.add_argument('--log', '-l', action='store_true', help='Display Git logs after applying the patches.')
     parser.add_argument('--oneline', '-o', action='store_true', help='Show Git logs in one-line format (requires --log).')
-    # parser.add_argument('--reset', action='store_true', help='Reset the repository to the state before applying patches.')
+    parser.add_argument('--reset', action='store_true', help='Reset the repository to the state before applying patches.')
     args = parser.parse_args()
 
     if args.oneline and not args.log:
@@ -70,45 +128,8 @@ def main():
     patch_root = args.patch if args.patch else os.path.join(PWD, patch_config.get('patch_root', ''))
     patch_list = patch_config.get('patch_list', [])
 
-    def apply_patch_list(target_path, patch_file_list):
-        separator("=")
-        target_full_path = os.path.join(target_root, target_path)
-        print(f'Target path: {target_full_path}')
-
-        original_dir = os.getcwd()
-        try:
-            os.chdir(target_full_path)
-
-            # if args.reset:
-            #    subprocess.run(['git', 'reset', '--hard', f'HEAD~{str(len(patch_file_list))}'], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-
-            for i, patch_path in enumerate(patch_file_list):
-                patch_full_path = os.path.join(patch_root, patch_path)
-                if args.check or args.apply or args.show:
-                    separator("-")
-                    print(f'Patch path  : {patch_full_path}')
-                if args.check or args.apply:
-                    apply_patch(patch_full_path, args)
-                if args.show:
-                    try:
-                        subprocess.run(['git', 'show', f'HEAD~{i}'], check=True, stderr=subprocess.PIPE)
-                    except subprocess.CalledProcessError as e:
-                        print(f"Error displaying show: {e.stderr.decode() if e.stderr else 'No error message available'}")
-
-            if args.log:
-                separator("-")
-                try:
-                    if not args.oneline:
-                        subprocess.run(['git', 'log', '-n', str(len(patch_file_list) + 1)], check=True, stderr=subprocess.PIPE)
-                    else:
-                        subprocess.run(['git', 'log', '-n', str(len(patch_file_list) + 1), '--oneline'], check=True, stderr=subprocess.PIPE)
-                except subprocess.CalledProcessError as e:
-                    print(f"Error displaying logs: {e.stderr.decode() if e.stderr else 'No error message available'}")
-        finally:
-            os.chdir(original_dir)
-
     for patch in patch_list:
-        apply_patch_list(patch['target'], patch['patch'])
+        apply_patch_list(patch['target'], patch['patch'], target_root, patch_root, args)
 
 
 if __name__ == '__main__':
