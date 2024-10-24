@@ -51,6 +51,7 @@ def main():
     parser.add_argument('--patch', type=str, help='Root path of the patches.')
     parser.add_argument('--apply', '-a', action='store_true', help='Apply patches using `git am`.')
     parser.add_argument('--check', '-c', action='store_true', help='Check if the patches can be applied cleanly.')
+    parser.add_argument('--show', '-s', action='store_true', help='Show the list of patches without applying them.')
     parser.add_argument('--log', '-l', action='store_true', help='Display Git logs after applying the patches.')
     parser.add_argument('--oneline', '-o', action='store_true', help='Show Git logs in one-line format (requires --log).')
     # parser.add_argument('--reset', action='store_true', help='Reset the repository to the state before applying patches.')
@@ -81,12 +82,18 @@ def main():
             # if args.reset:
             #    subprocess.run(['git', 'reset', '--hard', f'HEAD~{str(len(patch_file_list))}'], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
-            if args.check or args.apply:
-                for patch_path in patch_file_list:
+            for i, patch_path in enumerate(patch_file_list):
+                patch_full_path = os.path.join(patch_root, patch_path)
+                if args.check or args.apply or args.show:
                     separator("-")
-                    patch_full_path = os.path.join(patch_root, patch_path)
                     print(f'Patch path  : {patch_full_path}')
+                if args.check or args.apply:
                     apply_patch(patch_full_path, args)
+                if args.show:
+                    try:
+                        subprocess.run(['git', 'show', f'HEAD~{i}'], check=True, stderr=subprocess.PIPE)
+                    except subprocess.CalledProcessError as e:
+                        print(f"Error displaying show: {e.stderr.decode() if e.stderr else 'No error message available'}")
 
             if args.log:
                 separator("-")
