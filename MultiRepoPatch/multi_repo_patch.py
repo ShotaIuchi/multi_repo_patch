@@ -162,14 +162,14 @@ def main() -> None:
 
     args = parser.parse_args()
 
-    patch_config = load_repositories_from_json(os.path.join(PWD, args.file))
+    patch_config = load_repositories_from_json(os.path.abspath(args.file))
 
     if not patch_config:
         print('Invalid or empty patch configuration. Exiting.')
         return
 
-    target_root = args.target if args.target else os.path.join(PWD, patch_config.get(JsonKeys.TARGET_ROOT, ''))
-    patch_root = args.patch if args.patch else os.path.join(PWD, patch_config.get(JsonKeys.PATCH_ROOT, ''))
+    target_root = os.path.abspath(args.target if args.target else patch_config.get(JsonKeys.TARGET_ROOT, ''))
+    patch_root = os.path.abspath(args.patch if args.patch else patch_config.get(JsonKeys.PATCH_ROOT, ''))
     patch_list = patch_config.get(JsonKeys.PATCH_LIST, [])
 
     isAllOk = True
