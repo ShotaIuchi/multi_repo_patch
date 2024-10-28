@@ -51,7 +51,7 @@ def load_repositories_from_json(json_file_path):
     return {}
 
 
-def run_git_command(command: list[str]) -> str:
+def run_git_command(command: list) -> str:
     try:
         result = subprocess.run(command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         return result.stdout.decode()
@@ -62,7 +62,7 @@ def run_git_command(command: list[str]) -> str:
     return None
 
 
-def run_git_command_nopipe(command: list[str]) -> str:
+def run_git_command_nopipe(command: list) -> str:
     try:
         result = subprocess.run(command, check=True, stderr=subprocess.PIPE)
         return result
